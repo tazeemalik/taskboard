@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>TaskBoard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    body{font-family:system-ui,Arial;margin:2rem;max-width:700px}
+    form{display:flex;gap:.5rem;margin-bottom:1rem}
+    input[type=text]{flex:1;padding:.5rem}
+    button{padding:.5rem 1rem}
+    li{display:flex;align-items:center;gap:.5rem}
+    .done{opacity:.6;text-decoration:line-through}
+    .stats{margin:1rem 0;padding:.5rem;background:#f4f4f4;border-radius:.5rem}
+  </style>
+</head>
+<body>
+  <h1>TaskBoard</h1>
+  <div class="stats" id="stats">stats will come from stats-api later…</div>
+  <form id="f">
+    <input id="title" type="text" placeholder="New task…" required/>
+    <button>Add</button>
+  </form>
+  <ul id="list"></ul>
+
+  <script>
+  // existing tasks helpers
+  async function fetchTasks(){ return (await fetch('/api/tasks')).json(); }
+
+  // NEW: stats helpers
+  async function fetchStats(){
+    try { return (await fetch('/api/stats')).json(); }
+    catch { return { total: 0, done: 0, pending: 0 }; }
+  }
+  async function renderStats(){
+    const s = await fetchStats();
+    const el = document.getElementById('stats');
+    el.textContent = `Total: ${s.total} | Done: ${s.done} | Pending: ${s.pending}`;
+  }
+
+  // render list + stats
+  async function render(){
+    const items = await fetchTasks();
+    const ul = document.getElementById('list'); ul.innerHTML = '';
+    items.forEach(it=>{
+      const li = document.createElement('li');
+
+      const chk = Object.assign(document.createElement('input'), {type:'checkbox', checked: !!it.done});
+      chk.onchange = async () => {
+        await fetch('/api/tasks/'+it._id, {
+          method:'PATCH',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({done: chk.checked})
+        });
+        render(); // refresh list & stats
+      };
+
+      const span = document.createElement('span');
+      span.textContent = it.title;
+      if (it.done) span.className = 'done';
+
+      const del = Object.assign(document.createElement('button'), {textContent:'✕'});
+      del.onclick = async ()=>{
+        await fetch('/api/tasks/'+it._id, { method:'DELETE' });
+        render(); // refresh list & stats
+      };
+
+      li.append(chk, span, del);
+      ul.append(li);
+    });
+
+    // NEW: update the stats banner
+    await renderStats();
+  }
+
+  // form handler
+  document.getElementById('f').onsubmit = async (e)=>{
+    e.preventDefault();
+    const title = document.getElementById('title').value.trim();
+    if(!title) return;
+    await fetch('/api/tasks', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({title})
+    });
+    document.getElementById('title').value = '';
+    render();
+  };
+
+  // initial paint
+  render();
+</script>
+  
+
+</body>
+</html>
