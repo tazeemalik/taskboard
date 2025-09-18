@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: textstore
+  labels: { app: textstore }
+spec:
+  selector: { app: textstore }
+  ports:
+    - port: 27017
+      targetPort: 27017
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: textstore
+  labels: { app: textstore }
+spec:
+  serviceName: textstore
+  replicas: 1
+  selector:
+    matchLabels: { app: textstore }
+  template:
+    metadata:
+      labels: { app: textstore }
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:6
+          ports:
+            - containerPort: 27017
+              name: mongodb
+          readinessProbe:
+            tcpSocket: { port: 27017 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: 27017 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          volumeMounts:
+            - name: mongo-data
+              mountPath: /data/db
+  volumeClaimTemplates:
+    - metadata:
+        name: mongo-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 1Gi
